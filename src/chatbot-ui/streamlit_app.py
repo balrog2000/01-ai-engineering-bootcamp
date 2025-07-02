@@ -3,6 +3,7 @@ from openai import OpenAI
 from core.config import config
 from google import genai
 from groq import Groq
+from google.genai.types import GenerateContentConfig
 
 clients = {
     "openai": OpenAI(api_key=config.OPENAI_API_KEY),
@@ -28,23 +29,34 @@ with st.sidebar:
     if provider is not None:
         model_name = st.selectbox('Model', model_lists[provider])
     
+    temperature = st.slider("Temperature", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
+    max_tokens = st.number_input("Max Tokens", min_value=1, value=500, step=200)
+    
     st.session_state.provider = provider
     st.session_state.model_name = model_name
+    st.session_state.temperature = temperature
+    st.session_state.max_tokens = max_tokens
 
 client = clients[st.session_state.provider]
 
 
-def run_llm(client, messages, max_tokens=500):
+def run_llm(client, messages, max_tokens=500, temperature=1.0):
     if st.session_state.provider == "google":
         return client.models.generate_content(
             model=st.session_state.model_name,
             contents=[message["content"] for message in messages],
+            config=GenerateContentConfig(
+                max_output_tokens=max_tokens,
+                temperature=temperature
+            )
         ).text
     else:
+        # seems the max_tokens is now deprecated
         return client.chat.completions.create(
             model=st.session_state.model_name,
             messages=messages,
-            max_tokens=max_tokens
+            max_completion_tokens=max_tokens,
+            temperature=temperature
         ).choices[0].message.content
 
 if "messages" not in st.session_state:
@@ -65,6 +77,6 @@ if prompt := st.chat_input("Hello! How can I help you today?"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        output = run_llm(client, st.session_state.messages)
+        output = run_llm(client, st.session_state.messages, max_tokens=st.session_state.max_tokens, temperature=st.session_state.temperature)
         st.write(output)
     st.session_state.messages.append({"role": "assistant", "content": output})
