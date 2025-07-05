@@ -10,5 +10,7 @@ dependencies = [
     "openai",
     "pydantic",
     "pydantic-settings",
-    "streamlit"
+    "streamlit",
+    "qdrant-client",
+    "langsmith"
 ]
