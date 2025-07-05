@@ -12,5 +12,8 @@ dependencies = [
     "pydantic-settings",
     "streamlit",
     "qdrant-client",
-    "langsmith"
+    "langsmith",
+    "langchain-openai",
+    "ragas",
+    "rapidfuzz"
 ]
