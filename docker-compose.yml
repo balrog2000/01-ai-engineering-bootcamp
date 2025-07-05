@@ -9,7 +9,7 @@ services:
       - .env
     restart: unless-stopped
     volumes:
-      - ./src/chatbot-ui:/app/src/chatbot-ui
+      - ./src/chatbot_ui:/app/src/chatbot_ui
 
   qdrant:
     image: qdrant/qdrant

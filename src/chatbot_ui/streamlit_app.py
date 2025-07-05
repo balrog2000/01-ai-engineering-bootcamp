@@ -1,3 +1,4 @@
+from qdrant_client import QdrantClient
 import streamlit as st
 from openai import OpenAI
 from core.config import config
@@ -11,6 +12,10 @@ clients = {
     "google": genai.Client(api_key=config.GOOGLE_API_KEY),
     "groq": Groq(api_key=config.GROQ_API_KEY)
 }
+
+qdrant_client = QdrantClient(
+    url=f"http://{config.QDRANT_HOST}:6333",
+)
 
 st.title("Chatbot UI")
 
@@ -82,6 +87,6 @@ if prompt := st.chat_input("Hello! How can I help you today?"):
 
     with st.chat_message("assistant"):
         # output = run_llm(client, st.session_state.messages, max_tokens=st.session_state.max_tokens, temperature=st.session_state.temperature)
-        output = rag_pipeline(prompt, top_k=st.session_state.top_k)
+        output = rag_pipeline(prompt, qdrant_client, top_k=st.session_state.top_k)
         st.write(output['answer'])
     st.session_state.messages.append({"role": "assistant", "content": output['answer']})
