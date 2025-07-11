@@ -20,5 +20,6 @@ dependencies = [
     "instructor",
     "fastapi",
     "uvicorn",
-    "httpx"
+    "httpx",
+    "jsonref"
 ]

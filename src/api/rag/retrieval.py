@@ -9,6 +9,12 @@ import instructor
 from openai import OpenAI
 from pydantic import BaseModel
 from pprint import pprint
+from typing import List
+import logging
+from google import genai
+from api.rag.utils.utils import prompt_template_config, prompt_template_registry    
+
+logger = logging.getLogger(__name__)
 
 @traceable(
     name="embed_query",
@@ -80,13 +86,8 @@ def retrieve_context(query, qdrant_client, top_k=5):
 )
 def process_context(context):
     formatted_context = ""
-    # pprint(context)
-    for chunk in context['retrieved_context']:
-        # pprint(chunk['score'])
-        formatted_context += f"- {chunk}\n"
-
-    # for chunk in context:
-    #     formatted_context += f"- {chunk}\n"
+    for index, chunk in zip(context['retrieved_context_ids'], context['retrieved_context']):
+        formatted_context += f"- {index}: {chunk} \n"
 
     return formatted_context
 
@@ -97,38 +98,40 @@ def process_context(context):
 def build_prompt(question, context):
 
     processed_context = process_context(context)
-    prompt = f"""
-You are a shopping assistant that can answer questions about the products in stock
-
-You will be given a question and a list of contexts.
-
-Instructions:
- - You need to answer the question based on the provided context only.
- - Never use word context and refer to it as the available products.
-
-Context:
-{processed_context}
-
-Question:
-{question}
-"""
+    # prompt_template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'rag_generation')
+    prompt_template = prompt_template_registry('rag-prompt')   
+    prompt = prompt_template.render(
+        processed_context=processed_context,
+        question=question
+    )
     return prompt
+
+class RAGUsedContext(BaseModel):
+    id: int
+    description: str
 
 class RAGGenerationResponse(BaseModel):
     answer: str
+    retrieved_context: List[RAGUsedContext]
 
 @traceable(
     name="generate_answer",
     run_type="llm",
     metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
+def log_completion_kwargs(*args, **kwargs) -> None:
+    logger.info("## Completion kwargs:")
+    print(kwargs)
+
 def generate_answer(prompt):
     # response = openai.chat.completions.create(
     #     model=config.GENERATION_MODEL,
     #     messages=[{"role": "user", "content": prompt}],
     #     temperature=0.5,
     # )
+    # logging.basicConfig(level=logging.DEBUG)
     client = instructor.from_openai(OpenAI(api_key=config.OPENAI_API_KEY))
+    client.on("completion:kwargs", log_completion_kwargs)
     response, raw_response = client.chat.completions.create_with_completion(
         model='gpt-4.1',
         response_model=RAGGenerationResponse,
@@ -174,5 +177,28 @@ def rag_pipeline_wrapper(question, top_k=5):
     )
 
     result = rag_pipeline(question, qdrant_client, top_k)
+
+    items = []
+    for context in result['answer'].retrieved_context:
+        payload = qdrant_client.retrieve(
+            collection_name=config.QDRANT_COLLECTION_NAME,
+            ids=[context.id],
+        )[0].payload
+        
+        image_url = payload.get('first_large_image')
+        price = payload.get('price')
+        if image_url:
+            items.append(
+                {
+                    'image_url': image_url,
+                    'price': price,
+                    'description': context.description,
+                }
+            )
+        
+
     
-    return result['answer'].answer
+    return {
+        'answer': result['answer'].answer,
+        'items': items,
+    }

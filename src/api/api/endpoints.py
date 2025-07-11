@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 import logging
-from api.api.models import RAGRequest, RAGResponse
+from api.api.models import RAGRequest, RAGResponse, RAGItem
 from api.rag.retrieval import rag_pipeline_wrapper
 logger = logging.getLogger(__name__)
 rag_router = APIRouter()
@@ -12,10 +12,16 @@ async def rag(
 ) -> RAGResponse:
 
     result = rag_pipeline_wrapper(payload.query)
+    items = [RAGItem(
+        image_url=item['image_url'],
+        price=item['price'],
+        description=item['description']
+    ) for item in result['items']]
 
     return RAGResponse(
         request_id=request.state.request_id,
-        answer=result
+        answer=result['answer'],
+        items=items
     )
 
 
