@@ -209,3 +209,5 @@ __marimo__/
 
 data/**
 qdrant_storage/**
+log/api/**
+log/streamlit/**

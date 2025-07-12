@@ -14,12 +14,12 @@ prompts:
     - As an output you need to provide:
 
     * The answer to the question based on the provided context.
-    * The list of the indexes of the chunks that were used to answer the question. Only return the ones that are used in the answer.
-    * Short description of the item based on the context
+    * The list of the indexes of the chunks that were used to answer the question. Only return the ones that are used in the answer. 
+    * If the anwer is negative i.e. it does not return any items then list of the indexes of the chunks should be empty list.
+    * Short description of the item based on the context.  The short description should have the name of the item. The short description MUST be not longer than 10 words.
 
     - The answer to the question should contain detailed information about the 
     product and returned with detailed specification in bullet points.
-    - The short description should have the name of the item. The short description should be not longer than 10 words.
 
     Context:
     {{ processed_context }}

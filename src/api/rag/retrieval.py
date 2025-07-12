@@ -11,8 +11,10 @@ from pydantic import BaseModel
 from pprint import pprint
 from typing import List
 import logging
+import json
 from google import genai
 from api.rag.utils.utils import prompt_template_config, prompt_template_registry    
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +100,8 @@ def process_context(context):
 def build_prompt(question, context):
 
     processed_context = process_context(context)
-    # prompt_template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'rag_generation')
-    prompt_template = prompt_template_registry('rag-prompt')   
+    prompt_template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'rag_generation')
+    # prompt_template = prompt_template_registry('rag-prompt')   
     prompt = prompt_template.render(
         processed_context=processed_context,
         question=question
@@ -114,22 +116,36 @@ class RAGGenerationResponse(BaseModel):
     answer: str
     retrieved_context: List[RAGUsedContext]
 
+
+
+# Ensure the logs directory exists
+os.makedirs("logs", exist_ok=True)
+
+# Set up a dedicated file logger for completion kwargs, disable stdout logging
+instructor_logger = logging.getLogger("instructor")
+instructor_logger.propagate = False  # Prevent logging to stdout/stderr
+if not instructor_logger.handlers:
+    file_handler = logging.FileHandler("logs/instructor.log")
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s %(asctime)s %(levelname)s ')
+    file_handler.setFormatter(formatter)
+    instructor_logger.addHandler(file_handler)
+    instructor_logger.setLevel(logging.INFO)
+    
+@traceable(
+    name="instructor_wrapping",
+    run_type="prompt"
+)
+def log_completion_kwargs(*args, **kwargs) -> None:
+    instructor_logger.info(json.dumps(args, indent=2))
+    instructor_logger.info(json.dumps(kwargs, indent=2))
+
+
 @traceable(
     name="generate_answer",
     run_type="llm",
     metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
-def log_completion_kwargs(*args, **kwargs) -> None:
-    logger.info("## Completion kwargs:")
-    print(kwargs)
-
 def generate_answer(prompt):
-    # response = openai.chat.completions.create(
-    #     model=config.GENERATION_MODEL,
-    #     messages=[{"role": "user", "content": prompt}],
-    #     temperature=0.5,
-    # )
-    # logging.basicConfig(level=logging.DEBUG)
     client = instructor.from_openai(OpenAI(api_key=config.OPENAI_API_KEY))
     client.on("completion:kwargs", log_completion_kwargs)
     response, raw_response = client.chat.completions.create_with_completion(
@@ -150,7 +166,7 @@ def generate_answer(prompt):
             'total_tokens': raw_response.usage.total_tokens,
             'output_tokens': raw_response.usage.completion_tokens,
         }
-    return response
+    return response, raw_response
 
 @traceable(
     name="rag_pipeline",
@@ -158,11 +174,12 @@ def generate_answer(prompt):
 def rag_pipeline(question, qdrant_client, top_k=5):
     retrieved_context = retrieve_context(question, qdrant_client, top_k)
     prompt = build_prompt(question, retrieved_context)
-    answer = generate_answer(prompt)
+    answer, raw_response = generate_answer(prompt)
 
     current_run = get_current_run_tree()
     final_result = {
         "answer": answer,
+        "raw_response": raw_response,
         "question": question,
         "retrieved_context_ids": retrieved_context['retrieved_context_ids'],
         "retrieved_context": retrieved_context['retrieved_context'],
@@ -196,8 +213,6 @@ def rag_pipeline_wrapper(question, top_k=5):
                 }
             )
         
-
-    
     return {
         'answer': result['answer'].answer,
         'items': items,

@@ -1,0 +1,18 @@
+{  
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: FastAPI Container Debug",
+      "type": "python",
+      "request": "attach",
+      "port": 5678,
+      "host": "localhost",
+      "pathMappings": [
+          {
+              "localRoot": "${workspaceFolder}/src/api",
+              "remoteRoot": "/app/src/api"
+          }
+      ]
+    }
+  ]
+}

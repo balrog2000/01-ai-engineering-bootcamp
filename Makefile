@@ -7,8 +7,11 @@ build-docker-streamlit:
 run-docker-streamlit:
 	docker run -v ${PWD}/.env:/app/.env -p 8501:8501 streamlit-app:latest
 
-run-docker-compose:
+run-docker-compose-no-proxy:
 	docker compose up --build
+
+run-docker-compose:
+	docker compose -f docker-compose.yml -f docker-compose.proxyman.yml up --build
 
 run-evals:
 	uv sync
