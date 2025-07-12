@@ -11,7 +11,7 @@ async def rag(
     payload: RAGRequest
 ) -> RAGResponse:
 
-    result = rag_pipeline_wrapper(payload.query)
+    result = rag_pipeline_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
     items = [RAGItem(
         image_url=item['image_url'],
         price=item['price'],

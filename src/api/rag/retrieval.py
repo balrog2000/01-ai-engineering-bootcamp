@@ -13,17 +13,37 @@ from typing import List
 import logging
 import json
 from google import genai
+from api.api.models import EmbeddingType
 from api.rag.utils.utils import prompt_template_config, prompt_template_registry    
 import os
+import open_clip
+import torch
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+clip_model, _, clip_preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
+clip_model.eval()  # model in train mode by default, impacts some models with BatchNorm or stochastic depth active
+clip_tokenizer = open_clip.get_tokenizer('ViT-B-32')
 
 @traceable(
-    name="embed_query",
+    name="embed_query_image",
+    run_type="embedding",
+    metadata={"ls_provider": 'openclip', "ls_model_name": 'ViT-B-32'}
+)
+def get_embedding_openclip(text):
+    logger.info(f"Embedding with OpenCLIP")
+    tokenized = clip_tokenizer(text)
+    with torch.no_grad(), torch.autocast("cuda"):
+        embedding = clip_model.encode_text(tokenized)[0]
+        return embedding.cpu().numpy().tolist()
+
+@traceable(
+    name="embed_query_text",
     run_type="embedding",
     metadata={"ls_provider": config.EMBEDDING_MODEL_PROVIDER, "ls_model_name": config.EMBEDDING_MODEL}
 )
-def get_embedding(text, model=config.EMBEDDING_MODEL):
+def get_embedding_openai(text, model=config.EMBEDDING_MODEL):
     response = openai.embeddings.create(
         input=[text],
         model=model,
@@ -41,32 +61,47 @@ def get_embedding(text, model=config.EMBEDDING_MODEL):
     name="retrieve_top_n",
     run_type="retriever",
 )
-def retrieve_context(query, qdrant_client, top_k=5):
-    query_embedding = get_embedding(query)
-    results = qdrant_client.query_points(
-        collection_name=config.QDRANT_COLLECTION_NAME,
-        prefetch=[
-            Prefetch(
-                query=query_embedding,
-                limit=20,
-            ),
-            Prefetch(
-                filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="text",
-                            match=MatchText(
-                                text=query,
-                            )
-                        )
-                    ]
+def retrieve_context(query, qdrant_client, embedding_type, fusion, top_k=5):
+    embedding_function = get_embedding_openai 
+    if embedding_type == EmbeddingType.IMAGE:
+        embedding_function = get_embedding_openclip
+    query_embedding = embedding_function(query)
+    collection_name = config.QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS if embedding_type == EmbeddingType.TEXT \
+        else config.QDRANT_COLLECTION_NAME_IMAGE_EMBEDDINGS
+    if fusion:
+        logger.info("Fusion enabled. Retrieving top {} results from {} collection".format(top_k, collection_name))
+        results = qdrant_client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                Prefetch(
+                    query=query_embedding,
+                    limit=20,
                 ),
-                limit=20
-            )
-        ],
-        query=FusionQuery(fusion="rrf"),
-        limit=top_k,
-    )
+                Prefetch(
+                    filter=Filter(
+                        must=[
+                            FieldCondition(
+                                key="text",
+                                match=MatchText(
+                                    text=query,
+                                )
+                            )
+                        ]
+                    ),
+                    limit=20
+                )
+            ],
+            query=FusionQuery(fusion="rrf"),
+            limit=top_k,
+        )
+    else:
+        logger.info("Fusion disabled. Retrieving top {} results from {} collection".format(top_k, collection_name))
+        results = qdrant_client.query_points(
+            collection_name=collection_name,
+            query=query_embedding,
+            limit=top_k,
+        )
+    logger.info(f"Retrieved {len(results.points)} results")
     current_run = get_current_run_tree()
     retrieved_context_ids = []
     retrieved_context = []
@@ -171,8 +206,8 @@ def generate_answer(prompt):
 @traceable(
     name="rag_pipeline",
 )
-def rag_pipeline(question, qdrant_client, top_k=5):
-    retrieved_context = retrieve_context(question, qdrant_client, top_k)
+def rag_pipeline(question, qdrant_client, embedding_type, fusion, top_k=5):
+    retrieved_context = retrieve_context(question, qdrant_client, embedding_type, fusion, top_k)
     prompt = build_prompt(question, retrieved_context)
     answer, raw_response = generate_answer(prompt)
 
@@ -188,17 +223,17 @@ def rag_pipeline(question, qdrant_client, top_k=5):
     return final_result
 
 
-def rag_pipeline_wrapper(question, top_k=5):
+def rag_pipeline_wrapper(question, embedding_type=EmbeddingType.TEXT, fusion=True, top_k=5):
     qdrant_client = QdrantClient(
         url=f'http://{config.QDRANT_HOST}:6333'
     )
 
-    result = rag_pipeline(question, qdrant_client, top_k)
+    result = rag_pipeline(question, qdrant_client, embedding_type, fusion, top_k)
 
     items = []
     for context in result['answer'].retrieved_context:
         payload = qdrant_client.retrieve(
-            collection_name=config.QDRANT_COLLECTION_NAME,
+            collection_name=config.QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS if embedding_type == EmbeddingType.TEXT else config.QDRANT_COLLECTION_NAME_IMAGE_EMBEDDINGS,
             ids=[context.id],
         )[0].payload
         

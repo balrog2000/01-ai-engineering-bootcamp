@@ -211,3 +211,6 @@ data/**
 qdrant_storage/**
 log/api/**
 log/streamlit/**
+
+.env_streamlit
+.env_api

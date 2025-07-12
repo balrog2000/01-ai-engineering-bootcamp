@@ -1,9 +1,15 @@
 from pydantic import BaseModel, Field
 from typing import List, Any, Optional
+from enum import Enum
 
+class EmbeddingType(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
 
 class RAGRequest(BaseModel):
     query: str = Field(..., description="The query to be used in the RAG pipeline")
+    embedding_type: EmbeddingType = Field(..., description="The embedding mode to be used in the RAG pipeline")
+    fusion: bool = Field(..., description="Whether to use fusion of payload index and embeddings")
 
 class RAGItem(BaseModel):
     image_url: str = Field(..., description="The URL of the image of the item")
