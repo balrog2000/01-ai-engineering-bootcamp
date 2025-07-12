@@ -21,7 +21,9 @@ async def rag(
     return RAGResponse(
         request_id=request.state.request_id,
         answer=result['answer'],
-        items=items
+        items=items,
+        used_context_count=result['used_context_count'],
+        not_used_context_count=result['not_used_context_count']
     )
 
 

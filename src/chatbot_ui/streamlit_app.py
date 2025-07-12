@@ -123,6 +123,7 @@ with chat_col:
             # Display items if available
             if 'items' in output and output['items']:
                 st.markdown("### Related Products")
+                st.markdown(f"Used {output['used_context_count']} items initially found, not used {output['not_used_context_count']} items")
                 
                 # Create columns for the items
                 cols = st.columns(min(len(output['items']), 6))  # Max 6 columns
@@ -196,8 +197,7 @@ with debug_col:
                         st.write(entry['data'])
                     else:
                         st.text(str(entry['data']))
-                    st.markdown("---")
-    
+                    st.markdown("---")    
     # API Configuration
     # with st.expander("API Configuration", expanded=False):
     #     st.json({

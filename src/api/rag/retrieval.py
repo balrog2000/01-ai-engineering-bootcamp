@@ -150,7 +150,8 @@ class RAGUsedContext(BaseModel):
 class RAGGenerationResponse(BaseModel):
     answer: str
     retrieved_context: List[RAGUsedContext]
-
+    used_context_count: int
+    not_used_context_count: int
 
 
 # Ensure the logs directory exists
@@ -251,4 +252,6 @@ def rag_pipeline_wrapper(question, embedding_type=EmbeddingType.TEXT, fusion=Tru
     return {
         'answer': result['answer'].answer,
         'items': items,
+        'used_context_count': result['answer'].used_context_count,
+        'not_used_context_count': result['answer'].not_used_context_count,
     }
