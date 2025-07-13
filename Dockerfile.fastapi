@@ -26,6 +26,8 @@ RUN python -m compileall ./src/api
 # Set PATH to use the virtual environment
 ENV PATH="/app/.venv/bin:$PATH"
 
+RUN uv pip install debugpy
+
 # Create non-root user and set permissions
 RUN addgroup --system app && \
     adduser --system --ingroup app --home /app app && \
@@ -39,4 +41,5 @@ USER app
 EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "src.api.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]

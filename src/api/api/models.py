@@ -8,6 +8,7 @@ class RAGRequest(BaseModel):
 class RAGItem(BaseModel):
     image_url: str = Field(..., description="The URL of the image of the item")
     price: Optional[float] = Field(..., description="The price of the item")
+    # description: str = Field(..., description="The description of the item", max_length=120)
     description: str = Field(..., description="The description of the item")
 
 class RAGResponse(BaseModel):
