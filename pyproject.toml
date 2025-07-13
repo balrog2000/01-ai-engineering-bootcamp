@@ -21,5 +21,6 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "httpx",
-    "jsonref"
+    "jsonref",
+    "open_clip_torch"
 ]

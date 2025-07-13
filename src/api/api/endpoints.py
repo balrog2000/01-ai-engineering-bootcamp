@@ -11,7 +11,7 @@ async def rag(
     payload: RAGRequest
 ) -> RAGResponse:
 
-    result = rag_pipeline_wrapper(payload.query)
+    result = rag_pipeline_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
     items = [RAGItem(
         image_url=item['image_url'],
         price=item['price'],
@@ -21,7 +21,9 @@ async def rag(
     return RAGResponse(
         request_id=request.state.request_id,
         answer=result['answer'],
-        items=items
+        items=items,
+        used_context_count=result['used_context_count'],
+        not_used_context_count=result['not_used_context_count']
     )
 
 

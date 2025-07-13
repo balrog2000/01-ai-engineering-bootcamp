@@ -17,6 +17,8 @@ prompts:
     * The list of the indexes of the chunks that were used to answer the question. Only return the ones that are used in the answer. 
     * If the anwer is negative i.e. it does not return any items then list of the indexes of the chunks should be empty list.
     * Short description of the item based on the context.  The short description should have the name of the item. The short description MUST be not longer than 10 words.
+    * Please also return 2 counts, count of the items that were used to answer the question and count of the items that were not used to answer the question
+    
 
     - The answer to the question should contain detailed information about the 
     product and returned with detailed specification in bullet points.

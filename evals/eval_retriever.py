@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient
-from chatbot_ui.core.config import config
+from api.core.config import config
 from chatbot_ui.retrieval import rag_pipeline
 
 from langsmith import Client

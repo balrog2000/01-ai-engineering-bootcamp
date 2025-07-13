@@ -85,7 +85,24 @@ with chat_col:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Hello! How can I help you today?"):
+    # Add embedding type selector, fusion checkbox, and chat input in columns
+    col1, col2, col3 = st.columns([2, 1, 4])
+    with col1:
+        embedding_type = st.selectbox(
+            "Embedding Type",
+            options=[
+                "Text embeddings (OpenAI)", 
+                "Image embeddings (OpenCLIP)"
+            ],
+            key="embedding_type",
+            label_visibility="collapsed",  
+        )
+    with col2:
+        fusion = st.checkbox("Fusion", key="fusion", label_visibility="visible", value=True)
+    with col3:
+        prompt = st.chat_input("Hello! How can I help you today?")
+
+    if prompt:
         # Add debug entry for user input
         # add_debug_entry("User Input", {"prompt": prompt, "timestamp": datetime.now().isoformat()})
         
@@ -95,12 +112,18 @@ with chat_col:
 
         with st.chat_message("assistant"):
             # output = run_llm(client, st.session_state.messages, max_tokens=st.session_state.max_tokens, temperature=st.session_state.temperature)
-            status, output = api_call('post', f'{config.API_URL}/rag', json={'query': prompt})
+            api_embedding_type = embedding_type.lower().split(" ")[0]
+            status, output = api_call('post', f'{config.API_URL}/rag', json={
+                'query': prompt, 
+                'embedding_type': api_embedding_type,
+                'fusion': fusion
+            })
             st.write(output['answer'])
             
             # Display items if available
             if 'items' in output and output['items']:
                 st.markdown("### Related Products")
+                st.markdown(f"Used {output['used_context_count']} items initially found, not used {output['not_used_context_count']} items")
                 
                 # Create columns for the items
                 cols = st.columns(min(len(output['items']), 6))  # Max 6 columns
@@ -174,8 +197,7 @@ with debug_col:
                         st.write(entry['data'])
                     else:
                         st.text(str(entry['data']))
-                    st.markdown("---")
-    
+                    st.markdown("---")    
     # API Configuration
     # with st.expander("API Configuration", expanded=False):
     #     st.json({

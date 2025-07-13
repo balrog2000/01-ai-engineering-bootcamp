@@ -6,7 +6,7 @@ services:
     ports:
       - 8501:8501
     env_file:
-      - .env
+      - .env_streamlit
     restart: unless-stopped
     volumes:
       - ./src/chatbot_ui:/app/src/chatbot_ui
@@ -18,7 +18,7 @@ services:
       - 8000:8000
       - 5678:5678
     env_file:
-      - .env
+      - .env_api
     restart: unless-stopped
     volumes:
       - ./src/api:/app/src/api
