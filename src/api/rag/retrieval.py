@@ -18,7 +18,7 @@ from api.rag.utils.utils import prompt_template_config, prompt_template_registry
 import os
 import open_clip
 import torch
-from api.rag.kafka_publisher import evaluation_publisher
+from api.rag.kafka_producer import evaluation_producer 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -151,8 +151,8 @@ def process_context(context):
 def build_prompt(question, context):
 
     processed_context = process_context(context)
-    prompt_template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'rag_generation')
-    # prompt_template = prompt_template_registry('rag-prompt')   
+    # prompt_template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'rag_generation')
+    prompt_template = prompt_template_registry('rag-prompt')   
     prompt = prompt_template.render(
         processed_context=processed_context,
         question=question
@@ -241,7 +241,7 @@ def rag_pipeline(question, qdrant_client, embedding_type, fusion, top_k=5):
     current_run = get_current_run_tree()
     if current_run:
         # Publish evaluation request to Kafka instead of processing synchronously
-        evaluation_publisher.publish_evaluation_request(
+        evaluation_producer.publish_evaluation_request(
             run_id=str(current_run.id),
             question=question,
             answer=answer.answer,

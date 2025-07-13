@@ -5,6 +5,8 @@ import os
 from typing import Dict, Any
 from evaluator.jobs.online import evaluate_current_run, evaluate_current_run_native_ls
 from langsmith import Client
+from requests.exceptions import HTTPError
+from evaluator.core.config import config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -13,13 +15,12 @@ logger = logging.getLogger(__name__)
 class EvaluationConsumer:
     def __init__(self):
         self.consumer = KafkaConsumer(
-            'evaluation-requests',
-            bootstrap_servers=['kafka:29092'],
+            config.KAFKA_TOPIC,
+            bootstrap_servers=[f'{config.KAFKA_HOST}:{config.KAFKA_PORT}'],
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            key_deserializer=lambda k: k.decode('utf-8') if k else None,
-            group_id='evaluation-consumer-group'
+            key_deserializer=lambda k: k.decode('utf-8') if k else None
         )
-        self.ls_client = Client(api_key=os.getenv("LANGSMITH_API_KEY"))
+        self.ls_client = Client(api_key=config.LANGSMITH_API_KEY)
         
     def process_message(self, message: Dict[str, Any]) -> None:
         """Process a single evaluation request"""
@@ -31,7 +32,25 @@ class EvaluationConsumer:
             
             logger.info(f"Processing evaluation for run {run_id}, question: {question}")
             
-            evaluate_current_run_native_ls(run_id, question, answer, retrieved_contexts)
+            import time
+
+            max_retries = 3
+            retry_delay = 5  # seconds
+
+            for attempt in range(max_retries):
+                try:
+                    # sometimes the run is not found, so we need to retry
+                    evaluate_current_run_native_ls(run_id, question, answer, retrieved_contexts)
+                    break  # Success, exit loop
+                except Exception as e:
+                    if "404" in str(e):
+                        logger.warning(f"FORK2 404 error encountered during evaluation (attempt {attempt+1}/{max_retries}). Retrying in {retry_delay} seconds...")
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay)
+                        else:
+                            logger.error("Max retries reached for 404 error. Skipping evaluation.")
+                    else:
+                        raise
 
         except Exception as e:
             logger.error(f"Error processing evaluation request: {e}")

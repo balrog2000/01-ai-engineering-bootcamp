@@ -16,6 +16,9 @@ class Config(BaseSettings):
     GENERATION_MODEL: str
     GENERATION_MODEL_PROVIDER: str
     PROMPT_TEMPLATE_PATH: str = "src/api/rag/prompts/rag_generation.yaml"
+    KAFKA_HOST: str
+    KAFKA_PORT: int
+    KAFKA_TOPIC: str
     
 
     # changing because we now use docker compose env
