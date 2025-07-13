@@ -14,10 +14,15 @@ class Config(BaseSettings):
     LANGSMITH_API_KEY: str
     GENERATION_MODEL: str
     GENERATION_MODEL_PROVIDER: str
-    API_URL: str = "http://api:8000"
+    PROMPT_TEMPLATE_PATH: str = "src/api/rag/prompts/rag_generation.yaml"
+    
 
     # changing because we now use docker compose env
+
     model_config = SettingsConfigDict(env_file=".env")
 
+class Settings(BaseSettings):
+    DEFAULT_TIMEOUT: float = 30.0
+    VERSION: str = "0.1.0"
 config = Config()
-
+settings = Settings()
