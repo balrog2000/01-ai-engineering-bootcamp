@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from typing import Dict, Any
-from evaluator.jobs.online import evaluate_current_run
+from evaluator.jobs.online import evaluate_current_run, evaluate_current_run_native_ls
 from langsmith import Client
 
 # Configure logging
@@ -31,7 +31,7 @@ class EvaluationConsumer:
             
             logger.info(f"Processing evaluation for run {run_id}, question: {question}")
             
-            evaluate_current_run(run_id, question, answer, retrieved_contexts)
+            evaluate_current_run_native_ls(run_id, question, answer, retrieved_contexts)
 
         except Exception as e:
             logger.error(f"Error processing evaluation request: {e}")
@@ -52,4 +52,4 @@ class EvaluationConsumer:
 
 if __name__ == "__main__":
     consumer = EvaluationConsumer()
-    consumer.run() 
+    consumer.run()
