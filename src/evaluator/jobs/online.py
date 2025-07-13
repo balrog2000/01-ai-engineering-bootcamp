@@ -1,10 +1,12 @@
+from langsmith.evaluation import EvaluationResults
 from ragas.metrics import Faithfulness, ResponseRelevancy
 from ragas.dataset_schema import SingleTurnSample
-from ragas.llms import LangchainLLMWrapper
+from ragas.llms import LangchainLLMWrapper  
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 import asyncio
-from langsmith import Client
+from langsmith import Client, RunEvaluator
+from langsmith.evaluation.evaluator import EvaluationResults, EvaluationResult
 import logging
 
 evaluator_logger = logging.getLogger(__name__)
@@ -57,6 +59,7 @@ def evaluate_ragas_metrics(question: str, answer: str, retrieved_contexts: list[
     return output
 
 def evaluate_current_run(run_id: str, question: str, answer: str, retrieved_contexts: list[str]) -> None:
+    evaluator_logger.info(f"Not using native langsmith evaluator")
     ls_client = Client()
     metrics = evaluate_ragas_metrics(question, answer, retrieved_contexts)
     ls_client.create_feedback(
@@ -71,3 +74,30 @@ def evaluate_current_run(run_id: str, question: str, answer: str, retrieved_cont
         score=metrics['relevancy']
     )
     evaluator_logger.info(f"Feedback created for run {run_id} -> faithfulness: {metrics['faithfulness']}, relevancy: {metrics['relevancy']}")
+
+class OnlineRagasEvaluator(RunEvaluator):   
+    def __init__(self, question: str, answer: str, retrieved_contexts: list[str]):
+        self.question = question
+        self.answer = answer
+        self.retrieved_contexts = retrieved_contexts
+
+    def evaluate_run(self, run, **kwargs) -> EvaluationResults:
+        metrics = evaluate_ragas_metrics(self.question, self.answer, self.retrieved_contexts)
+        return EvaluationResults(results=[
+            EvaluationResult(
+                key="faithfulness",
+                score=metrics['faithfulness']
+            ),
+            EvaluationResult(
+                key="relevancy",
+                score=metrics['relevancy']
+            )
+        ])
+
+def evaluate_current_run_native_ls(run_id: str, question: str, answer: str, retrieved_contexts: list[str]) -> None:
+    evaluator_logger.info(f"Using native langsmith evaluator")
+    ls_client = Client()
+    ls_client.evaluate_run(
+        run_id,
+        OnlineRagasEvaluator(question, answer, retrieved_contexts)
+    )
