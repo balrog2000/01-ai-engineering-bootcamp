@@ -8,3 +8,13 @@ services:
       SSL_CERT_FILE: /proxyman/ca.pem
     volumes:
       - /Users/tomek/Library/Application Support/com.proxyman.NSProxy-setapp/app-data/proxyman-ca.pem:/proxyman/ca.pem:ro
+
+  evaluator:
+    environment:
+      HTTP_PROXY: http://host.docker.internal:9090
+      HTTPS_PROXY: http://host.docker.internal:9090
+      NO_PROXY: localhost,127.0.0.1,qdrant,::1
+      REQUESTS_CA_BUNDLE: /proxyman/ca.pem
+      SSL_CERT_FILE: /proxyman/ca.pem
+    volumes:
+      - /Users/tomek/Library/Application Support/com.proxyman.NSProxy-setapp/app-data/proxyman-ca.pem:/proxyman/ca.pem:ro
