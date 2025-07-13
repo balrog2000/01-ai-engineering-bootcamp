@@ -13,6 +13,19 @@
               "remoteRoot": "/app/src/api"
           }
       ]
+    },
+    {
+      "name": "Python: Evaluator Container Debug",
+      "type": "python",
+      "request": "attach",
+      "port": 5679,
+      "host": "localhost",
+      "pathMappings": [
+          {
+              "localRoot": "${workspaceFolder}/src/evaluator",
+              "remoteRoot": "/app/src/evaluator"
+          }
+      ]
     }
-  ]
+  ],
 }

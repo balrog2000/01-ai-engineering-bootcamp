@@ -23,6 +23,66 @@ services:
     volumes:
       - ./src/api:/app/src/api
       - ./log/api:/app/logs
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  evaluator:
+    build:
+      context: .
+      dockerfile: Dockerfile.evaluator
+    ports:
+      - 5679:5679
+    env_file:
+      - .env_evaluator
+    restart: unless-stopped
+    volumes:
+      - ./src/evaluator:/app/src/evaluator
+    depends_on:
+      kafka:
+        condition: service_healthy
+    # Enable live reload with Docker Compose v2.20+ (if available)
+    develop:
+      watch:
+        - path: ./src/evaluator
+          action: restart
+
+  kafka:
+    image: obsidiandynamics/kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:29093"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:29092,EXTERNAL://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_RESTART_ATTEMPTS: "10"
+      KAFKA_RESTART_DELAY: "5"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "WARN"
+      KAFKA_LOG4J_TOOLS_ROOT_LOGLEVEL: "WARN"
+      KAFKA_LOG4J_LOGGERS: "apache.kafka=WARN,apache.zookeeper=WARN,apache.kafka=WARN,apache.kafka.kafka.cluster=WARN,apache.kafka.controller=WARN,apache.kafka.coordinator=WARN,apache.kafka.log=WARN,apache.kafka.network=WARN,kafka.producer=WARN,kafka.consumer=WARN,kafka.request.logger=WARN,kafka.server=WARN,kafka.utils=WARN"
+      KAFKA_NODE_ID: "1"
+      KAFKA_METADATA_LOG_DIR: "/tmp/kraft-combined-logs"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9092"]      
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  kafdrop:
+    image: obsidiandynamics/kafdrop
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: "kafka:29092"
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   qdrant:
     image: qdrant/qdrant
@@ -32,3 +92,4 @@ services:
     volumes:
       - ./qdrant_storage:/qdrant/storage:z
     restart: unless-stopped
+

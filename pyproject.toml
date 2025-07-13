@@ -22,5 +22,6 @@ dependencies = [
     "uvicorn",
     "httpx",
     "jsonref",
-    "open_clip_torch"
+    "open_clip_torch",
+    "kafka-python"
 ]

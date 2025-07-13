@@ -185,7 +185,7 @@ with debug_col:
         if not st.session_state.debug_data:
             st.info("No debug data yet. Start chatting to see debug information!")
         else:
-            for entry in reversed(st.session_state.debug_data):  # Show newest first
+            for entry in st.session_state.debug_data:  
                 with st.container():
                     st.markdown(f"**{entry['timestamp']} - {entry['title']}**")
                     st.markdown(f"*Category: {entry['category']}*")

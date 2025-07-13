@@ -18,13 +18,29 @@ from api.rag.utils.utils import prompt_template_config, prompt_template_registry
 import os
 import open_clip
 import torch
+from api.rag.kafka_publisher import evaluation_publisher
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+stream_handler = logging.StreamHandler()
+formatter = logging.Formatter(f"\033[94m%(asctime)s %(levelname)s %(name)s %(message)s\033[0m")
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
+logger.propagate = False
+logger.info("Retrieval logger initialized")
 
 clip_model, _, clip_preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
 clip_model.eval()  # model in train mode by default, impacts some models with BatchNorm or stochastic depth active
 clip_tokenizer = open_clip.get_tokenizer('ViT-B-32')
+
+def red(text: str) -> str:
+    return f"\033[91m{text}\033[0m"
+
+def green(text: str) -> str:
+    return f"\033[92m{text}\033[0m"
+
+def blue(text: str) -> str:
+    return f"\033[94m{text}\033[0m"
 
 @traceable(
     name="embed_query_image",
@@ -213,6 +229,7 @@ def rag_pipeline(question, qdrant_client, embedding_type, fusion, top_k=5):
     answer, raw_response = generate_answer(prompt)
 
     current_run = get_current_run_tree()
+    logger.info(blue(f"Run id: {current_run.id}"))
     final_result = {
         "answer": answer,
         "raw_response": raw_response,
@@ -221,6 +238,16 @@ def rag_pipeline(question, qdrant_client, embedding_type, fusion, top_k=5):
         "retrieved_context": retrieved_context['retrieved_context'],
         "similarity_scores": retrieved_context['similarity_scores'],
     }
+    current_run = get_current_run_tree()
+    if current_run:
+        # Publish evaluation request to Kafka instead of processing synchronously
+        evaluation_publisher.publish_evaluation_request(
+            run_id=str(current_run.id),
+            question=question,
+            answer=answer.answer,
+            retrieved_contexts=retrieved_context['retrieved_context']
+        )
+
     return final_result
 
 
