@@ -19,7 +19,7 @@ class Config(BaseSettings):
     KAFKA_HOST: str
     KAFKA_PORT: int
     KAFKA_TOPIC: str
-    
+    KAFKA_ENABLED: bool
 
     # changing because we now use docker compose env
 

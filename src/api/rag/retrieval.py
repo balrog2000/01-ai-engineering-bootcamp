@@ -239,7 +239,7 @@ def rag_pipeline(question, qdrant_client, embedding_type, fusion, top_k=5):
         "similarity_scores": retrieved_context['similarity_scores'],
     }
     current_run = get_current_run_tree()
-    if current_run:
+    if current_run and config.KAFKA_ENABLED:
         # Publish evaluation request to Kafka instead of processing synchronously
         evaluation_producer.publish_evaluation_request(
             run_id=str(current_run.id),

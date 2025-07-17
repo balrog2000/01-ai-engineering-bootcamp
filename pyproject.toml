@@ -23,5 +23,9 @@ dependencies = [
     "httpx",
     "jsonref",
     "open_clip_torch",
-    "kafka-python"
+    "kafka-python",
+    "langgraph",
+    "langgraph-checkpoint-postgres",
+    "psycopg2-binary",
+    "psycopg[binary]"
 ]

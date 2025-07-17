@@ -23,9 +23,9 @@ services:
     volumes:
       - ./src/api:/app/src/api
       - ./log/api:/app/logs
-    depends_on:
-      kafka:
-        condition: service_healthy
+    # depends_on:
+    #   kafka:
+    #     condition: service_healthy
 
   evaluator:
     build:
@@ -46,6 +46,8 @@ services:
       watch:
         - path: ./src/evaluator
           action: restart
+    profiles:
+      - manual
 
   kafka:
     image: docker.io/bitnami/kafka:4.0
@@ -70,6 +72,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    profiles:
+      - manual
+
 
   kafdrop:
     image: obsidiandynamics/kafdrop
@@ -81,6 +86,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+    profiles:
+      - manual
 
   qdrant:
     image: qdrant/qdrant

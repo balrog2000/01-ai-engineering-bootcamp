@@ -39,4 +39,7 @@ class EvaluationProducer:
         self.producer.close()
 
 # Global publisher instance
-evaluation_producer = EvaluationProducer() 
+if config.KAFKA_ENABLED:
+    evaluation_producer = EvaluationProducer() 
+else:
+    evaluation_producer = None
