@@ -32,6 +32,7 @@ dependencies = [
     { name = "qdrant-client" },
     { name = "ragas" },
     { name = "rapidfuzz" },
+    { name = "rich" },
     { name = "streamlit" },
     { name = "uvicorn" },
 ]
@@ -59,6 +60,7 @@ requires-dist = [
     { name = "qdrant-client" },
     { name = "ragas" },
     { name = "rapidfuzz" },
+    { name = "rich" },
     { name = "streamlit" },
     { name = "uvicorn" },
 ]

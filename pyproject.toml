@@ -27,5 +27,6 @@ dependencies = [
     "langgraph",
     "langgraph-checkpoint-postgres",
     "psycopg2-binary",
-    "psycopg[binary]"
+    "psycopg[binary]",
+    "rich"
 ]
