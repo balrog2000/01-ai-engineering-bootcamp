@@ -61,7 +61,7 @@ def agent_node(state) -> dict:
             'output_tokens': raw_response.usage.completion_tokens,
         }
 
-    if response.tool_calls:
+    if response.tool_calls and not response.final_answer:
         tool_calls = []
         for i, tc in enumerate(response.tool_calls):
             tool_calls.append({

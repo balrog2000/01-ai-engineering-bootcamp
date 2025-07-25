@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from api.rag.agent import agent_node
 from api.core.config import config
 from qdrant_client import QdrantClient
+from langgraph.checkpoint.postgres import PostgresSaver
 
 class State(BaseModel):
     messages: Annotated[List[Any], add] = [] # reducer (it will add messages to the list)
@@ -19,7 +20,7 @@ class State(BaseModel):
     final_answer: bool = Field(default=False)
     available_tools: List[Dict[str, Any]] = []
     tool_calls: Optional[List[ToolCall]] = Field(default_factory=list)
-    retrieved_context: Annotated[List[RAGUsedContext], add] = []
+    retrieved_context: List[RAGUsedContext] = []
 
 
 def tool_router(state: State) -> str:
@@ -27,7 +28,7 @@ def tool_router(state: State) -> str:
 
     if state.final_answer:
         return 'end'
-    elif state.iteration > 3:
+    elif state.iteration > 1:
         return 'end'
     elif len(state.tool_calls) > 0:
         return 'tools'
@@ -56,24 +57,27 @@ workflow.add_conditional_edges(
 )
 workflow.add_edge('tool_node', 'agent_node')
 
-graph = workflow.compile()
-
-def run_agent(question: str):
+def run_agent(question: str, thread_id: str):
     initial_state = {
         "messages": [{"role": "user", "content": question}],
+        'iteration': 0,
         "available_tools": tool_descriptions
     }
 
-    result = graph.invoke(initial_state)
+    checkpointer_config = {'configurable': {'thread_id': thread_id}}
+
+    with PostgresSaver.from_conn_string("postgresql://langgraph_user:langgraph_password@postgres:5432/langgraph_db") as checkpointer:
+        graph = workflow.compile(checkpointer=checkpointer)
+        result = graph.invoke(initial_state, config=checkpointer_config)
 
     return result
 
-def run_agent_wrapper(question: str):
+def run_agent_wrapper(question: str, thread_id: str):
     qdrant_client = QdrantClient(
         url=f'http://{config.QDRANT_HOST}:6333'
     )
 
-    result = run_agent(question)
+    result = run_agent(question, thread_id)
 
     items = []
     for context in result['retrieved_context']:
