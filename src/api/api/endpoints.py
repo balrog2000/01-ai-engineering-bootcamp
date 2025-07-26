@@ -12,7 +12,7 @@ async def rag(
 ) -> RAGResponse:
 
     # result = run_agent_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
-    result = run_agent_wrapper(payload.query)
+    result = run_agent_wrapper(payload.query, thread_id=payload.thread_id)
     items = [RAGItem(
         image_url=item['image_url'],
         price=item['price'],

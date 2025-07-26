@@ -215,3 +215,5 @@ log/streamlit/**
 .env_streamlit
 .env_api
 .env_evaluator
+
+postgres_data/**

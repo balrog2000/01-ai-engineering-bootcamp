@@ -5,8 +5,16 @@ import requests
 from typing import Dict, List, Any, cast
 import json
 from datetime import datetime
+import uuid
 
 st.set_page_config(page_title="Ecommerce assistant", layout="wide")
+
+def get_session_id():
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+    return st.session_state.session_id
+
+session_id = get_session_id()
 
 # Initialize debug data in session state
 if 'debug_data' not in st.session_state:
@@ -116,7 +124,8 @@ with chat_col:
             status, output = api_call('post', f'{config.API_URL}/rag', json={
                 'query': prompt, 
                 'embedding_type': api_embedding_type,
-                'fusion': fusion
+                'fusion': fusion,
+                'thread_id': session_id
             })
             st.write(output['answer'])
             
