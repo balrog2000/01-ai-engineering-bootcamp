@@ -4,7 +4,9 @@ from langsmith import traceable, get_current_run_tree
 import openai
 import logging
 from api.core.config import config
-
+from typing import List
+from pydantic import BaseModel
+import sqlite3
 logger = logging.getLogger(__name__)
 
 qdrant_client = QdrantClient(
@@ -114,3 +116,46 @@ def get_formatted_context(query: str, top_k: int = 5) -> str:
     context = retrieve_context(query, top_k=top_k)
     formatted_context = process_context(context)
     return formatted_context
+
+
+
+class Review(BaseModel):
+    chunk_id: int
+    parent_asin: str
+    score: int  # 1-5
+    text: str
+
+def get_reviews(chunk_ids: List[int]) -> List[Review]:
+    """ Get the reviews for a given list of chunk IDs.
+
+    Args:
+        chunk_ids: The list of indexes of the chunks to get the reviews for
+        
+    Returns:
+        A list of Review objects for the given chunk IDs. 
+        Every Review object consists of chunk_id, parent_asin, score, text.
+    """
+    objects = qdrant_client.retrieve(
+        collection_name=config.QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS,
+        ids=chunk_ids,
+    )
+    asins_ids = {
+        object.payload['parent_asin']: object.id for object in objects
+    }
+    review_cutoff = 50
+    review_count_by_parent_asin = {}
+    placeholders = ",".join("?" for _ in asins_ids.keys())
+    
+    db = sqlite3.connect('data/reviews_filtered.db')
+    cursor = db.cursor()
+    query_format = f"SELECT parent_asin, rating, title, text FROM reviews WHERE asin IN ({placeholders}) OR parent_asin IN ({placeholders})"
+    cursor.execute(query_format, list(asins_ids.keys()) * 2)
+    reviews = cursor.fetchall()
+    result = []
+    for review in reviews:
+        review_count_by_parent_asin[review[0]] = review_count_by_parent_asin.get(review[0], 0) + 1
+        if review_count_by_parent_asin[review[0]] <= review_cutoff:
+            result.append(Review(chunk_id=asins_ids[review[0]], parent_asin=review[0], score=review[1], text=f'{review[2]} - {review[3]}'))
+        else:
+            print(f'Skipping review for {review[0]} because it has already been added {review_count_by_parent_asin[review[0]]} times')
+    return result

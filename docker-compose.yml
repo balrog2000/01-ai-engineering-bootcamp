@@ -22,6 +22,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./src/api:/app/src/api
+      - ./data:/app/data
       - ./log/api:/app/logs
     # depends_on:
     #   kafka:

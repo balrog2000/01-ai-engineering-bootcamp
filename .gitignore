@@ -208,6 +208,8 @@ __marimo__/
 
 
 data/**
+!data/
+!data/reviews_filtered.db
 qdrant_storage/**
 log/api/**
 log/streamlit/**
@@ -217,3 +219,6 @@ log/streamlit/**
 .env_evaluator
 
 postgres_data/**
+
+.DS_Store
+.DS_Store
