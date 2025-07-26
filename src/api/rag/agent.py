@@ -28,7 +28,7 @@ class AgentResponse(BaseModel): # structured output for pydantic
 
 @traceable(
     name="agent_node",
-    run_type="llm",
+run_type="llm",
     metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
 def agent_node(state) -> dict:
@@ -37,7 +37,7 @@ def agent_node(state) -> dict:
     prompt_template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'rag_generation')
     prompt = prompt_template.render(
         available_tools=state.available_tools,
-    )
+    )   
 
     messages = state.messages
     conversation = []

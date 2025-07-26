@@ -17,8 +17,9 @@ class RAGItem(BaseModel):
     price: Optional[float] = Field(..., description="The price of the item")
     # description: str = Field(..., description="The description of the item", max_length=120)
     description: str = Field(..., description="The description of the item")
+    parent_asin: str = Field(..., description="The parent ASIN of the item") 
 
-class RAGResponse(BaseModel):
+class RAGResponse(BaseModel): 
     request_id: str = Field(..., description="The request ID")
     answer: str = Field(..., description="The content of the RAG response")
     items: List[RAGItem] = Field(..., description="The items that were used to answer the question")
