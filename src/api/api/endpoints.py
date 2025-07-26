@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 import logging
 from api.api.models import RAGRequest, RAGResponse, RAGItem
-from api.rag.retrieval import rag_pipeline_wrapper
+from api.rag.graph import run_agent_wrapper
 logger = logging.getLogger(__name__)
 rag_router = APIRouter()
 
@@ -11,7 +11,8 @@ async def rag(
     payload: RAGRequest
 ) -> RAGResponse:
 
-    result = rag_pipeline_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
+    # result = run_agent_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
+    result = run_agent_wrapper(payload.query)
     items = [RAGItem(
         image_url=item['image_url'],
         price=item['price'],
@@ -22,8 +23,8 @@ async def rag(
         request_id=request.state.request_id,
         answer=result['answer'],
         items=items,
-        used_context_count=result['used_context_count'],
-        not_used_context_count=result['not_used_context_count']
+        # used_context_count=result['used_context_count'],
+        # not_used_context_count=result['not_used_context_count']
     )
 
 

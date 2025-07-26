@@ -23,10 +23,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down...")
     await client.aclose()
-    
-    # Close Kafka producer
-    from api.rag.kafka_publisher import evaluation_publisher
-    evaluation_publisher.close()
+
 
 app = FastAPI(lifespan=lifespan)
 

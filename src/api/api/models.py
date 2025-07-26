@@ -21,5 +21,5 @@ class RAGResponse(BaseModel):
     request_id: str = Field(..., description="The request ID")
     answer: str = Field(..., description="The content of the RAG response")
     items: List[RAGItem] = Field(..., description="The items that were used to answer the question")
-    used_context_count: int = Field(..., description="The count of the items that were used to answer the question")
-    not_used_context_count: int = Field(..., description="The count of the items that were not used to answer the question")
+    # used_context_count: int = Field(..., description="The count of the items that were used to answer the question")
+    # not_used_context_count: int = Field(..., description="The count of the items that were not used to answer the question")

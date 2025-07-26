@@ -38,4 +38,4 @@ USER app
 
 # Command to run the evaluator service
 # CMD ["python", "-m", "src.evaluator.kafka_consumer"]  
-CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", "--listen", "0.0.0.0:5679", "-m", "src.evaluator.kafka_consumer"]
+CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", "--listen", "0.0.0.0:5679", "-m", "src.evaluator.queue.kafka_consumer"]

@@ -7,17 +7,16 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-class EvaluationPublisher:
+class EvaluationProducer:
     def __init__(self):
         self.producer = KafkaProducer(
-            bootstrap_servers=['kafka:29092'],
+            bootstrap_servers=[f'{config.KAFKA_HOST}:{config.KAFKA_PORT}'],
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             key_serializer=lambda k: k.encode('utf-8') if k else None
         )
-        self.topic = "evaluation-requests"
+        self.topic = config.KAFKA_TOPIC
         
     def publish_evaluation_request(self, run_id: str, question: str, answer: str, retrieved_contexts: list[str]) -> None:
-        """Publish evaluation request to Kafka topic"""
         message = {
             "run_id": run_id,
             "question": question,
@@ -37,8 +36,10 @@ class EvaluationPublisher:
             logger.error(f"Failed to publish evaluation request to Kafka: {e}")
             
     def close(self):
-        """Close the Kafka producer"""
         self.producer.close()
 
 # Global publisher instance
-evaluation_publisher = EvaluationPublisher() 
+if config.KAFKA_ENABLED:
+    evaluation_producer = EvaluationProducer() 
+else:
+    evaluation_producer = None
