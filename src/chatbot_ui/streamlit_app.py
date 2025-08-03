@@ -14,6 +14,13 @@ def get_session_id():
         st.session_state.session_id = str(uuid.uuid4())
     return st.session_state.session_id
 
+def reset_session():
+    """Reset session ID and clear all messages"""
+    st.session_state.session_id = str(uuid.uuid4())
+    st.session_state.messages = []
+    st.session_state.debug_data = []
+    st.rerun()
+
 session_id = get_session_id()
 
 # Initialize debug data in session state
@@ -85,6 +92,12 @@ chat_col, debug_col = st.columns([1, 1])
 
 with chat_col:
     st.title("Ecommerce Assistant")
+    
+    # Add reset button in the top right
+    col_title, col_reset = st.columns([4, 1])
+    with col_reset:
+        if st.button("🔄 Reset Session", type="secondary", use_container_width=True):
+            reset_session()
     
     if 'messages' not in st.session_state:
         st.session_state.messages = []

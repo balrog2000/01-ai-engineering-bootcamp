@@ -217,3 +217,5 @@ log/streamlit/**
 .env_evaluator
 
 postgres_data/**
+
+**/.DS_Store

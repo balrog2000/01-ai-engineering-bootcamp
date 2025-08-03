@@ -1,10 +1,13 @@
 from operator import add
 from typing import Annotated, Any, Dict, List, Optional
 
+import numpy as np
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+
 from pydantic import BaseModel, Field
 
 from api.rag.agent import RAGUsedContext, ToolCall
-from api.rag.tools import get_formatted_context
+from api.rag.tools import get_formatted_item_context, get_formatted_review_context
 from api.rag.utils.utils import get_tool_descriptions_from_node
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
@@ -12,6 +15,32 @@ from api.rag.agent import agent_node
 from api.core.config import config
 from qdrant_client import QdrantClient
 from langgraph.checkpoint.postgres import PostgresSaver
+from rich.logging import RichHandler
+from rich.console import Console
+from rich.theme import Theme
+from rich.pretty import pretty_repr, pprint
+import logging
+
+# Create a file for logging output
+log_file_path = "logs/graph.log"
+
+# Set up a Console that writes to the log file
+log_file = open(log_file_path, "a", encoding="utf-8")
+file_console = Console(file=log_file, force_terminal=True, color_system="auto", theme=Theme({}), width=190, soft_wrap=True)
+
+graph_logger = logging.getLogger("graph")
+graph_logger.propagate = False  # Prevent logging to stdout/stderr
+if not graph_logger.handlers:
+    rich_handler = RichHandler(
+        console=file_console,
+        rich_tracebacks=True,
+        show_time=True,
+        show_level=True,
+        show_path=True,
+        markup=True,
+    )
+    graph_logger.addHandler(rich_handler)
+    graph_logger.setLevel(logging.INFO)
 
 class State(BaseModel):
     messages: Annotated[List[Any], add] = [] # reducer (it will add messages to the list)
@@ -28,7 +57,7 @@ def tool_router(state: State) -> str:
 
     if state.final_answer:
         return 'end'
-    elif state.iteration > 1:
+    elif state.iteration > 5:
         return 'end'
     elif len(state.tool_calls) > 0:
         return 'tools'
@@ -37,7 +66,7 @@ def tool_router(state: State) -> str:
 
 workflow = StateGraph(State)
 
-tools = [get_formatted_context]
+tools = [get_formatted_item_context, get_formatted_review_context]
 
 tool_node = ToolNode(tools)
 
@@ -68,7 +97,12 @@ def run_agent(question: str, thread_id: str):
 
     with PostgresSaver.from_conn_string("postgresql://langgraph_user:langgraph_password@postgres:5432/langgraph_db") as checkpointer:
         graph = workflow.compile(checkpointer=checkpointer)
-        result = graph.invoke(initial_state, config=checkpointer_config)
+        result = None
+        for mode, chunk in graph.stream(initial_state, stream_mode=["values", "updates"],config=checkpointer_config):   
+            if mode == "updates":
+                graph_logger.info(pretty_repr(chunk))
+            if mode == "values":
+                result = chunk
 
     return result
 
@@ -80,12 +114,23 @@ def run_agent_wrapper(question: str, thread_id: str):
     result = run_agent(question, thread_id)
 
     items = []
+    dummy_vector = np.zeros(1536).tolist()
     for context in result['retrieved_context']:
-        payload = qdrant_client.retrieve(
-            # collection_name=config.QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS if embedding_type == EmbeddingType.TEXT else config.QDRANT_COLLECTION_NAME_IMAGE_EMBEDDINGS,
+        payload = qdrant_client.query_points(
             collection_name=config.QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS,
-            ids=[context.id],
-        )[0].payload
+            query=dummy_vector,
+            query_filter=Filter(
+                must=FieldCondition(
+                    key="parent_asin",
+                    match=MatchValue(
+                        value=context.id
+                    )
+                )
+            ),
+            with_payload=True,
+            limit=1
+        )
+        payload = payload.points[0].payload
         
         image_url = payload.get('first_large_image')
         price = payload.get('price')

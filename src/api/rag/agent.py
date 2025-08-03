@@ -17,11 +17,11 @@ class ToolCall(BaseModel):
     arguments: dict
 
 class RAGUsedContext(BaseModel):
-    id: int
+    id: str
     description: str
 
 class AgentResponse(BaseModel): # structured output for pydantic
-    answer: str
+    answer: str 
     tool_calls: List[ToolCall] = Field(default_factory=list)
     final_answer: bool = Field(default=False)
     retrieved_context: List[RAGUsedContext]
