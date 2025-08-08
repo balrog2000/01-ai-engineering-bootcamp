@@ -50,6 +50,7 @@ class State(BaseModel):
     available_tools: List[Dict[str, Any]] = []
     tool_calls: Optional[List[ToolCall]] = Field(default_factory=list)
     retrieved_context: List[RAGUsedContext] = []
+    trace_id: str = ""
 
 
 def tool_router(state: State) -> str:
@@ -147,4 +148,5 @@ def run_agent_wrapper(question: str, thread_id: str):
     return {
         'answer': result['answer'],
         'items': items,
+        'trace_id': result['trace_id'],
     }
