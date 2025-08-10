@@ -6,6 +6,7 @@ class Config(BaseSettings):
     QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS: str = "Amazon-items-collection-12-items"
     EMBEDDING_MODEL: str
     EMBEDDING_MODEL_PROVIDER: str
+    QDRANT_COLLECTION_NAME_REVIEWS: str = "Amazon-items-collection-12-reviews"
 
     model_config = SettingsConfigDict(env_file=".env_api")
 

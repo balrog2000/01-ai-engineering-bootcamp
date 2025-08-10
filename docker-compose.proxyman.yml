@@ -3,7 +3,7 @@ services:
     environment:
       HTTP_PROXY: http://host.docker.internal:9090
       HTTPS_PROXY: http://host.docker.internal:9090
-      NO_PROXY: localhost,127.0.0.1,qdrant,::1
+      NO_PROXY: localhost,127.0.0.1,qdrant,reviews_mcp_server,items_mcp_server,::1
       REQUESTS_CA_BUNDLE: /proxyman/ca.pem
       SSL_CERT_FILE: /proxyman/ca.pem
     volumes:
@@ -13,7 +13,7 @@ services:
     environment:
       HTTP_PROXY: http://host.docker.internal:9090
       HTTPS_PROXY: http://host.docker.internal:9090
-      NO_PROXY: localhost,127.0.0.1,qdrant,::1
+      NO_PROXY: localhost,127.0.0.1,qdrant,reviews_mcp_server,items_mcp_server,::1
       REQUESTS_CA_BUNDLE: /proxyman/ca.pem
       SSL_CERT_FILE: /proxyman/ca.pem
     volumes:

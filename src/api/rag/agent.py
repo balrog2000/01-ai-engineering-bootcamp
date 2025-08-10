@@ -15,6 +15,7 @@ from api.rag.utils.utils import prompt_template_config
 class ToolCall(BaseModel):
     name: str
     arguments: dict
+    server: str
 
 class RAGUsedContext(BaseModel):
     id: str

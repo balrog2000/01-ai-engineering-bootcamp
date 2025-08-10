@@ -4,6 +4,7 @@ from langsmith import traceable, get_current_run_tree
 import openai
 import logging
 from api.core.config import config
+from fastmcp import Client
 
 logger = logging.getLogger(__name__)
 
@@ -187,3 +188,4 @@ def get_formatted_review_context(query: str, item_list: list[str], top_k: int = 
     context = retrieve_review_context(query, item_list, top_k=top_k)
     formatted_context = process_review_context(context)
     return formatted_context
+

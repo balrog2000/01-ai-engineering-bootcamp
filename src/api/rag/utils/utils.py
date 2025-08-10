@@ -7,6 +7,7 @@ import ast
 import inspect
 from typing import Dict, Any
 import src.api.rag.tools as tools
+from fastmcp import Client as FastMCPClient
 
 ls_client = Client()
 
@@ -208,3 +209,57 @@ def lc_messages_to_regular_messages(msg):
     else:
 
         return {"role": "user", "content": str(msg)}
+
+
+async def get_tool_descriptions_from_mcp_servers(mcp_servers: list[str]) -> list[dict]:
+
+    tool_descriptions = []
+
+    for mcp_server in mcp_servers:
+        client = FastMCPClient(mcp_server)
+        async with client:
+            tools = await client.list_tools()
+            for tool in tools:
+                tool_description = {
+                    'name': tool.name,
+                    'description': tool.description.split("\n\n")[0],
+                    'required': tool.inputSchema.get('required', []),
+                    'returns': {
+                        'type': 'string',
+                        'description': tool.description.split("Returns:")[1].strip(),
+                    },
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {}
+                    },
+                    'server': mcp_server,
+                }
+                property_descriptions = parse_docstring_params(tool.description)
+                properties = tool.inputSchema.get('properties', {})
+
+                for key, value in properties.items():
+                    properties[key]['description'] = property_descriptions.get(key, '')
+
+                tool_description['parameters']['properties'] = properties
+                tool_descriptions.append(tool_description)
+
+    return tool_descriptions
+
+# MCP tool node
+
+async def mcp_tool_node(state) -> str:
+    tool_messages = []
+
+    for i, tool_call in enumerate(state.tool_calls):
+        client = FastMCPClient(tool_call.server)
+        async with client:
+            result = await client.call_tool(tool_call.name, tool_call.arguments)
+            tool_message = ToolMessage(
+                content=result,
+                tool_call_id=f'call_{i}'
+            )
+            tool_messages.append(tool_message)
+
+    return {
+        'messages': tool_messages,
+    }
