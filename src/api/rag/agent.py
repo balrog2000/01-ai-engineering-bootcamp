@@ -15,13 +15,14 @@ from api.rag.utils.utils import prompt_template_config
 class ToolCall(BaseModel):
     name: str
     arguments: dict
+    server: str
 
 class RAGUsedContext(BaseModel):
-    id: int
+    id: str
     description: str
 
 class AgentResponse(BaseModel): # structured output for pydantic
-    answer: str
+    answer: str 
     tool_calls: List[ToolCall] = Field(default_factory=list)
     final_answer: bool = Field(default=False)
     retrieved_context: List[RAGUsedContext]
@@ -60,6 +61,9 @@ def agent_node(state) -> dict:
             'total_tokens': raw_response.usage.total_tokens,
             'output_tokens': raw_response.usage.completion_tokens,
         }
+        # id returns the run_id (not the main trace_id)
+        # sometimes the trace_id is not available, so we use the run_id
+        trace_id = str(getattr(current_run, 'trace_id', current_run.id))
 
     if response.tool_calls and not response.final_answer:
         tool_calls = []
@@ -86,4 +90,5 @@ def agent_node(state) -> dict:
         "answer": response.answer,
         "final_answer": response.final_answer,
         "retrieved_context": response.retrieved_context,
+        "trace_id": trace_id,
     }

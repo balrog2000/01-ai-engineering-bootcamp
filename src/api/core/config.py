@@ -5,8 +5,9 @@ class Config(BaseSettings):
     GOOGLE_API_KEY: str
     GROQ_API_KEY: str
     QDRANT_HOST: str
-    QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS: str
+    QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS: str = "Amazon-items-collection-12-items"
     QDRANT_COLLECTION_NAME_IMAGE_EMBEDDINGS: str
+    QDRANT_COLLECTION_NAME_REVIEWS: str = "Amazon-items-collection-12-reviews"
     EMBEDDING_MODEL: str
     EMBEDDING_MODEL_PROVIDER: str
     LANGSMITH_PROJECT: str
