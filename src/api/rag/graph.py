@@ -6,11 +6,11 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from pydantic import BaseModel, Field
 
-from api.rag.agent import RAGUsedContext, ToolCall
+from api.rag.agents import RAGUsedContext, ToolCall
 from api.rag.utils.utils import get_tool_descriptions_from_mcp_servers, mcp_tool_node
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
-from api.rag.agent import agent_node
+from api.rag.agents import product_qa_agent_node, intent_router_agent_node
 from api.core.config import config
 from qdrant_client import QdrantClient
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -48,9 +48,19 @@ class State(BaseModel):
     final_answer: bool = Field(default=False)
     available_tools: List[Dict[str, Any]] = []
     tool_calls: Optional[List[ToolCall]] = Field(default_factory=list)
-    retrieved_context: List[RAGUsedContext] = []
+    retrieved_context: List[RAGUsedContext] = Field(default_factory=list)
     trace_id: str = ""
+    user_intent: str = ""
 
+### Routers
+
+def user_intent_router(state: State) -> str:
+    """Decide whether to continue or end"""
+    
+    if state.user_intent == "product_qa":
+        return "product_qa_agent"
+    else:
+        return "end"
 
 def tool_router(state: State) -> str:
     """Decide whether to continue or end"""
@@ -67,19 +77,31 @@ def tool_router(state: State) -> str:
 workflow = StateGraph(State)
 
 
-workflow.add_node('agent_node', agent_node)
-workflow.add_node('mcp_tool_node', mcp_tool_node)
+workflow.add_edge(START, "intent_router_agent_node")
 
-workflow.add_edge(START, "agent_node")
+workflow.add_node("intent_router_agent_node", intent_router_agent_node)
+workflow.add_node("product_qa_agent_node", product_qa_agent_node)
+workflow.add_node("mcp_tool_node", mcp_tool_node)
+
 workflow.add_conditional_edges(
-    'agent_node',
-    tool_router,
+    "intent_router_agent_node",
+    user_intent_router,
     {
-        'tools': 'mcp_tool_node',
-        'end': END
+        "product_qa_agent": "product_qa_agent_node",
+        "end": END
     }
 )
-workflow.add_edge('mcp_tool_node', 'agent_node')
+
+workflow.add_conditional_edges(
+    "product_qa_agent_node",
+    tool_router,
+    {
+        "tools": "mcp_tool_node",
+        "end": END
+    }
+)
+
+workflow.add_edge("mcp_tool_node", "product_qa_agent_node")
 
 async def run_agent(question: str, thread_id: str):
 
@@ -117,7 +139,7 @@ async def run_agent_wrapper(question: str, thread_id: str):
 
     items = []
     dummy_vector = np.zeros(1536).tolist()
-    for context in result['retrieved_context']:
+    for context in result.get('retrieved_context', []):
         payload = qdrant_client.query_points(
             collection_name=config.QDRANT_COLLECTION_NAME_TEXT_EMBEDDINGS,
             query=dummy_vector,

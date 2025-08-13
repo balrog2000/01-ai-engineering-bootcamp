@@ -21,6 +21,8 @@ async def rag(
         description=item['description']
     ) for item in result['items']]
 
+    logger.info(f"RAG response: {result}")
+
     return RAGResponse(
         request_id=request.state.request_id,
         answer=result['answer'],
