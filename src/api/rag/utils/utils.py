@@ -24,6 +24,27 @@ def prompt_template_registry(prompt_name):
     template = Template(template_content)
     return template
 
+def format_ai_message(response):
+    # if response.tool_calls and not response.final_answer:
+    if response.tool_calls:
+        tool_calls = []
+        for i, tc in enumerate(response.tool_calls):
+            tool_calls.append({
+                "id": f"call_{i}",
+                "name": tc.name,
+                "args": tc.arguments
+            })
+
+        ai_message = AIMessage(
+            content=response.answer,
+            tool_calls=tool_calls
+        )
+    else:
+        ai_message = AIMessage(
+            content=response.answer,
+        )
+
+    return ai_message
 
 #### TOOLS Descriptions parsing ####
 
@@ -250,7 +271,7 @@ async def get_tool_descriptions_from_mcp_servers(mcp_servers: list[str]) -> list
 async def mcp_tool_node(state) -> str:
     tool_messages = []
 
-    for i, tool_call in enumerate(state.tool_calls):
+    for i, tool_call in enumerate(state.mcp_tool_calls):
         client = FastMCPClient(tool_call.server)
         async with client:
             result = await client.call_tool(tool_call.name, tool_call.arguments)

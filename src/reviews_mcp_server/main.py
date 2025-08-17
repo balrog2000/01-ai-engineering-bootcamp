@@ -14,7 +14,9 @@ def get_formatted_review_context(query: str, item_list: list[str], top_k: int = 
     Returns:
         A string of the top k context chunks with IDs prepending each chunk, each representing an inventory item for a given query.
     """
-
+    print(f'Making dirty fix cause there is a problem with 10000 b responses')
+    if top_k > 10:
+        top_k = 10
     context = retrieve_review_context(query, item_list, top_k=top_k)
     formatted_context = process_review_context(context)
     return formatted_context

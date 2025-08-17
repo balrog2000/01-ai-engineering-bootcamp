@@ -1,3 +1,4 @@
+from math import prod
 from operator import add
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -6,11 +7,11 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from pydantic import BaseModel, Field
 
-from api.rag.agents import RAGUsedContext, ToolCall
-from api.rag.utils.utils import get_tool_descriptions_from_mcp_servers, mcp_tool_node
+from api.rag.agents import RAGUsedContext, ToolCall, MCPToolCall
+from api.rag.utils.utils import get_tool_descriptions_from_mcp_servers, mcp_tool_node, get_tool_descriptions_from_node
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
-from api.rag.agents import product_qa_agent_node, intent_router_agent_node
+from api.rag.agents import product_qa_agent_node, intent_router_agent_node, shopping_cart_agent_node
 from api.core.config import config
 from qdrant_client import QdrantClient
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -19,6 +20,8 @@ from rich.console import Console
 from rich.theme import Theme
 from rich.pretty import pretty_repr, pprint
 import logging
+from api.rag.tools import add_to_shopping_cart, remove_from_cart, get_shopping_cart
+
 
 # Create a file for logging output
 log_file_path = "logs/graph.log"
@@ -41,67 +44,98 @@ if not graph_logger.handlers:
     graph_logger.addHandler(rich_handler)
     graph_logger.setLevel(logging.INFO)
 
+
 class State(BaseModel):
-    messages: Annotated[List[Any], add] = [] # reducer (it will add messages to the list)
-    iteration: int = Field(default=0)
+    messages: Annotated[List[Any], add] = []
     answer: str = ""
+    product_qa_iteration: int = Field(default=0)
+    shopping_cart_iteration: int = Field(default=0)
     final_answer: bool = Field(default=False)
-    available_tools: List[Dict[str, Any]] = []
+    product_qa_available_tools: List[Dict[str, Any]] = []
+    shopping_cart_available_tools: List[Dict[str, Any]] = []
     tool_calls: Optional[List[ToolCall]] = Field(default_factory=list)
-    retrieved_context: List[RAGUsedContext] = Field(default_factory=list)
+    mcp_tool_calls: Optional[List[MCPToolCall]] = Field(default_factory=list)
+    retrieved_context_ids: List[RAGUsedContext] = Field(default_factory=list)
     trace_id: str = ""
     user_intent: str = ""
+    user_id: str = ""
+    cart_id: str = ""
 
 ### Routers
-
 def user_intent_router(state: State) -> str:
     """Decide whether to continue or end"""
     
     if state.user_intent == "product_qa":
         return "product_qa_agent"
+    elif state.user_intent == "shopping_cart":
+        return "shopping_cart_agent"
     else:
         return "end"
 
-def tool_router(state: State) -> str:
-    """Decide whether to continue or end"""
-
+def product_qa_tool_router(state: State) -> str:
+    
     if state.final_answer:
-        return 'end'
-    elif state.iteration > 5:
-        return 'end'
-    elif len(state.tool_calls) > 0:
-        return 'tools'
+        return "end"
+    elif state.product_qa_iteration > 2:
+        return "end"
+    elif len(state.mcp_tool_calls) > 0:
+        return "tools"
     else:
-        return 'end'
+        return "end"
+
+def shopping_cart_tool_router(state: State) -> str:
+    if state.final_answer:
+        return "end"
+    elif state.shopping_cart_iteration > 2:
+        return "end"
+    elif len(state.tool_calls) > 0:
+        return "tools"
+    else:
+        return "end"
+
+shopping_cart_agent_tools = [add_to_shopping_cart, remove_from_cart, get_shopping_cart]
+shopping_cart_tool_node = ToolNode(shopping_cart_agent_tools)
+shopping_cart_tool_descriptions = get_tool_descriptions_from_node(shopping_cart_tool_node)
+
 
 workflow = StateGraph(State)
-
-
 workflow.add_edge(START, "intent_router_agent_node")
-
 workflow.add_node("intent_router_agent_node", intent_router_agent_node)
 workflow.add_node("product_qa_agent_node", product_qa_agent_node)
-workflow.add_node("mcp_tool_node", mcp_tool_node)
+workflow.add_node("shopping_cart_agent_node", shopping_cart_agent_node)
+workflow.add_node("product_qa_tool_node", mcp_tool_node)
+workflow.add_node("shopping_cart_tool_node", shopping_cart_tool_node)
 
 workflow.add_conditional_edges(
     "intent_router_agent_node",
     user_intent_router,
     {
         "product_qa_agent": "product_qa_agent_node",
+        "shopping_cart_agent": "shopping_cart_agent_node",
         "end": END
     }
 )
 
 workflow.add_conditional_edges(
     "product_qa_agent_node",
-    tool_router,
+    product_qa_tool_router,
     {
-        "tools": "mcp_tool_node",
+        "tools": "product_qa_tool_node",
         "end": END
     }
 )
 
-workflow.add_edge("mcp_tool_node", "product_qa_agent_node")
+workflow.add_conditional_edges(
+    "shopping_cart_agent_node",
+    shopping_cart_tool_router,
+    {
+        "tools": "shopping_cart_tool_node",
+        "end": END
+    }
+)
+
+workflow.add_edge("product_qa_tool_node", "product_qa_agent_node")
+workflow.add_edge("shopping_cart_tool_node", "shopping_cart_agent_node")
 
 async def run_agent(question: str, thread_id: str):
 
@@ -110,11 +144,15 @@ async def run_agent(question: str, thread_id: str):
         'http://reviews_mcp_server:8000/mcp/',
     ]
 
-    tool_descriptions = await get_tool_descriptions_from_mcp_servers(mcp_servers)
+    product_qa_tool_descriptions = await get_tool_descriptions_from_mcp_servers(mcp_servers)
     initial_state = {
         "messages": [{"role": "user", "content": question}],
-        'iteration': 0,
-        "available_tools": tool_descriptions
+        'user_id': thread_id,
+        'cart_id': thread_id,
+        'product_qa_iteration': 0,
+        'shopping_cart_iteration': 0,
+        "product_qa_available_tools": product_qa_tool_descriptions,
+        "shopping_cart_available_tools": shopping_cart_tool_descriptions
     }
 
     checkpointer_config = {'configurable': {'thread_id': thread_id}}
@@ -166,10 +204,19 @@ async def run_agent_wrapper(question: str, thread_id: str):
                     'description': context.description,
                 }
             )
+    shopping_cart = get_shopping_cart(thread_id, thread_id)
+    shopping_cart_items = [{
+        'price': x.get('price'),
+        'quantity': x.get('quantity'),
+        'currency': x.get('currency'),
+        'product_image_url': x.get('product_image_url'),
+        'total_price': x.get('total_price'),
+    } for x in shopping_cart]
 
 
     return {
         'answer': result['answer'],
         'items': items,
+        'shopping_cart': shopping_cart_items,
         'trace_id': result['trace_id'],
     }
