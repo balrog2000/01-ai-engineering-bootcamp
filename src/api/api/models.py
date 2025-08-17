@@ -18,11 +18,19 @@ class RAGItem(BaseModel):
     # description: str = Field(..., description="The description of the item", max_length=120)
     description: str = Field(..., description="The description of the item")
 
+class ShoppingCartItem(BaseModel):
+    price: Optional[float] = Field(..., description="The price of the item")
+    quantity: int = Field(..., description="The quantity of the item")
+    currency: str = Field(..., description="The currency of the item")
+    product_image_url: str = Field(..., description="The URL of the image of the item")
+    total_price: Optional[float] = Field(..., description="The total price of the item")
+
 class RAGResponse(BaseModel):
     request_id: str = Field(..., description="The request ID")
     answer: str = Field(..., description="The content of the RAG response")
     items: List[RAGItem] = Field(..., description="The items that were used to answer the question")
     trace_id: str = Field(..., description="The trace ID")
+    shopping_cart: List[ShoppingCartItem] = Field(..., description="The shopping cart items")
     # used_context_count: int = Field(..., description="The count of the items that were used to answer the question")
     # not_used_context_count: int = Field(..., description="The count of the items that were not used to answer the question")
 

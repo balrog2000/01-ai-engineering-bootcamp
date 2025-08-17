@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 import logging
-from api.api.models import RAGRequest, RAGResponse, RAGItem, FeedbackRequest, FeedbackResponse
+from api.api.models import RAGRequest, RAGResponse, RAGItem, FeedbackRequest, FeedbackResponse, ShoppingCartItem
 from api.processors.submit_feedback import submit_feedback
 from api.rag.graph import run_agent_wrapper
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ async def rag(
     payload: RAGRequest
 ) -> RAGResponse:
 
-    # result = run_agent_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
+    # resu lt = run_agent_wrapper(payload.query, embedding_type=payload.embedding_type, fusion=payload.fusion)
     result = await run_agent_wrapper(payload.query, thread_id=payload.thread_id)
     items = [RAGItem(
         image_url=item['image_url'],
@@ -21,11 +21,22 @@ async def rag(
         description=item['description']
     ) for item in result['items']]
 
+    shopping_cart = [ShoppingCartItem(
+        price=item['price'],
+        quantity=item['quantity'],
+        currency=item['currency'],
+        product_image_url=item['product_image_url'],
+        total_price=item['total_price']
+    ) for item in result['shopping_cart']]
+
+    logger.info(f"RAG response: {result}")
+
     return RAGResponse(
         request_id=request.state.request_id,
         answer=result['answer'],
         items=items,
         trace_id=result['trace_id'], 
+        shopping_cart=shopping_cart,
         # used_context_count=result['used_context_count'],
         # not_used_context_count=result['not_used_context_count']
     )
