@@ -32,8 +32,14 @@ class ProductQAAgentResponse(BaseModel): # structured output for pydantic
     final_answer: bool = Field(default=False)
     retrieved_context: List[RAGUsedContext]
 
-class IntentRouterAgentResponse(BaseModel):
-    user_intent: str
+class Delegation(BaseModel):
+    agent: str
+    task: str = Field(default="")
+
+class CoordinatorAgentResponse(BaseModel):
+    next_agent: str
+    plan: list[Delegation]
+    final_answer: bool = Field(default=False)
     answer: str
 
 class ShoppingCartAgentResponse(BaseModel):
@@ -76,9 +82,6 @@ def product_qa_agent_node(state) -> dict:
             'total_tokens': raw_response.usage.total_tokens,
             'output_tokens': raw_response.usage.completion_tokens,
         }
-        # id returns the run_id (not the main trace_id)
-        # sometimes the trace_id is not available, so we use the run_id
-        trace_id = str(getattr(current_run, 'trace_id', current_run.id))
 
     ai_message = format_ai_message(response)
 
@@ -87,20 +90,19 @@ def product_qa_agent_node(state) -> dict:
         "mcp_tool_calls": response.tool_calls,
         "product_qa_iteration": state.product_qa_iteration + 1,
         "answer": response.answer,
-        "final_answer": response.final_answer,
+        "product_qa_final_answer": response.final_answer,
         "retrieved_context": response.retrieved_context,
-        "trace_id": trace_id,
     }
 
-# Intent Router Agent
+# Coordinator Agent
 
 @traceable(
-    name="intent_router_agent",
+    name="coordinator_agent",
     run_type="llm",
     metadata={"ls_provider": "openai", "ls_model_name": "gpt-4.1"}
 )
-def intent_router_agent_node(state) -> dict:
-    template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'intent_router_agent')
+def coordinator_agent_node(state) -> dict:
+    template = prompt_template_config(config.PROMPT_TEMPLATE_PATH, 'coordinator_agent')
     
     prompt = template.render()
 
@@ -115,7 +117,7 @@ def intent_router_agent_node(state) -> dict:
 
     response, raw_response = client.chat.completions.create_with_completion(
             model="gpt-4.1",
-            response_model=IntentRouterAgentResponse,
+            response_model=CoordinatorAgentResponse,
             messages=[{"role": "system", "content": prompt}, *conversation],
             temperature=0,
     )
@@ -129,16 +131,19 @@ def intent_router_agent_node(state) -> dict:
         }
         trace_id = str(getattr(current_run, 'trace_id', current_run.id))
 
-    if response.user_intent == "product_qa":
-        ai_message = []
-    else:
-        ai_message = [AIMessage(
-            content=response.answer,
-        )]
+    # if response.user_intent == "product_qa":
+    #     ai_message = []
+    # else:
+    #     ai_message = [AIMessage(
+    #         content=response.answer,
+    #     )]
 
     return {
-        "messages": ai_message,
-        "user_intent": response.user_intent,
+        # "messages": ai_message,
+        "next_agent": response.next_agent,
+        "plan": response.plan,
+        "coordinator_final_answer": response.final_answer,
+        "coordinator_iteration": state.coordinator_iteration + 1,
         "answer": response.answer,
         "trace_id": trace_id,
     }
@@ -192,6 +197,6 @@ def shopping_cart_agent_node(state) -> dict:
         "messages": [ai_message],
         "tool_calls": response.tool_calls,
         "shopping_cart_iteration": state.shopping_cart_iteration + 1,
+        "shopping_cart_final_answer": response.final_answer,
         "answer": response.answer,
-        "final_answer": response.final_answer,
     }

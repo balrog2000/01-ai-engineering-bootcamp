@@ -29,7 +29,7 @@ async def rag(
         total_price=item['total_price']
     ) for item in result['shopping_cart']]
 
-    logger.info(f"RAG response: {result}")
+    # logger.info(f"RAG response: {result}")
 
     return RAGResponse(
         request_id=request.state.request_id,

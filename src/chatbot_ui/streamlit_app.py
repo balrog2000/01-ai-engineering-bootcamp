@@ -236,6 +236,7 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
         status, output = api_call("post", f"{config.API_URL}/rag", json={"query": prompt, "thread_id": session_id})
         # Update retrieved items and shopping cart
         st.session_state.retrieved_items = output.get("items", [])
+        # logger.info(f'Output: {output}')
         st.session_state.shopping_cart = output.get("shopping_cart", [])
         st.session_state.trace_id = output.get("trace_id", None)
         

@@ -7,11 +7,11 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from pydantic import BaseModel, Field
 
-from api.rag.agents import RAGUsedContext, ToolCall, MCPToolCall
+from api.rag.agents import RAGUsedContext, ToolCall, MCPToolCall, Delegation
 from api.rag.utils.utils import get_tool_descriptions_from_mcp_servers, mcp_tool_node, get_tool_descriptions_from_node
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
-from api.rag.agents import product_qa_agent_node, intent_router_agent_node, shopping_cart_agent_node
+from api.rag.agents import product_qa_agent_node, coordinator_agent_node, shopping_cart_agent_node
 from api.core.config import config
 from qdrant_client import QdrantClient
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -44,39 +44,54 @@ if not graph_logger.handlers:
     graph_logger.addHandler(rich_handler)
     graph_logger.setLevel(logging.INFO)
 
-
 class State(BaseModel):
     messages: Annotated[List[Any], add] = []
     answer: str = ""
+
+    coordinator_iteration: int = Field(default=0)
     product_qa_iteration: int = Field(default=0)
     shopping_cart_iteration: int = Field(default=0)
-    final_answer: bool = Field(default=False)
+
+    coordinator_final_answer: bool = Field(default=False)
+    product_qa_final_answer: bool = Field(default=False)
+    shopping_cart_final_answer: bool = Field(default=False)
+
     product_qa_available_tools: List[Dict[str, Any]] = []
     shopping_cart_available_tools: List[Dict[str, Any]] = []
+
     tool_calls: Optional[List[ToolCall]] = Field(default_factory=list)
     mcp_tool_calls: Optional[List[MCPToolCall]] = Field(default_factory=list)
-    retrieved_context_ids: List[RAGUsedContext] = Field(default_factory=list)
-    trace_id: str = ""
-    user_intent: str = ""
+    retrieved_context: List[RAGUsedContext] = Field(default_factory=list)
+    
     user_id: str = ""
     cart_id: str = ""
 
+    next_agent: str = ""
+    plan: list[Delegation] = Field(default_factory=list)
+
+    trace_id: str = ""
+
+
 ### Routers
-def user_intent_router(state: State) -> str:
+def coordinator_router(state: State) -> str:
     """Decide whether to continue or end"""
-    
-    if state.user_intent == "product_qa":
+
+    if state.coordinator_final_answer:
+        return "end"
+    elif state.coordinator_iteration > 4:
+        return "end"
+    elif state.next_agent == "product_qa_agent":
         return "product_qa_agent"
-    elif state.user_intent == "shopping_cart":
+    elif state.next_agent == "shopping_cart_agent":
         return "shopping_cart_agent"
     else:
         return "end"
 
 def product_qa_tool_router(state: State) -> str:
     
-    if state.final_answer:
+    if state.product_qa_final_answer:
         return "end"
-    elif state.product_qa_iteration > 2:
+    elif state.product_qa_iteration > 3:
         return "end"
     elif len(state.mcp_tool_calls) > 0:
         return "tools"
@@ -84,9 +99,9 @@ def product_qa_tool_router(state: State) -> str:
         return "end"
 
 def shopping_cart_tool_router(state: State) -> str:
-    if state.final_answer:
+    if state.shopping_cart_final_answer:
         return "end"
-    elif state.shopping_cart_iteration > 2:
+    elif state.shopping_cart_iteration > 3:
         return "end"
     elif len(state.tool_calls) > 0:
         return "tools"
@@ -99,16 +114,16 @@ shopping_cart_tool_descriptions = get_tool_descriptions_from_node(shopping_cart_
 
 
 workflow = StateGraph(State)
-workflow.add_edge(START, "intent_router_agent_node")
-workflow.add_node("intent_router_agent_node", intent_router_agent_node)
+workflow.add_edge(START, "coordinator_agent_node")
+workflow.add_node("coordinator_agent_node", coordinator_agent_node)
 workflow.add_node("product_qa_agent_node", product_qa_agent_node)
 workflow.add_node("shopping_cart_agent_node", shopping_cart_agent_node)
 workflow.add_node("product_qa_tool_node", mcp_tool_node)
 workflow.add_node("shopping_cart_tool_node", shopping_cart_tool_node)
 
 workflow.add_conditional_edges(
-    "intent_router_agent_node",
-    user_intent_router,
+    "coordinator_agent_node",
+    coordinator_router,
     {
         "product_qa_agent": "product_qa_agent_node",
         "shopping_cart_agent": "shopping_cart_agent_node",
@@ -121,7 +136,7 @@ workflow.add_conditional_edges(
     product_qa_tool_router,
     {
         "tools": "product_qa_tool_node",
-        "end": END
+        "end": 'coordinator_agent_node'
     }
 )
 
@@ -130,7 +145,7 @@ workflow.add_conditional_edges(
     shopping_cart_tool_router,
     {
         "tools": "shopping_cart_tool_node",
-        "end": END
+        "end": 'coordinator_agent_node'
     }
 )
 
@@ -149,10 +164,17 @@ async def run_agent(question: str, thread_id: str):
         "messages": [{"role": "user", "content": question}],
         'user_id': thread_id,
         'cart_id': thread_id,
+
+        'coordinator_iteration': 0,
         'product_qa_iteration': 0,
         'shopping_cart_iteration': 0,
+
+        'coordinator_final_answer': False,
+        'product_qa_final_answer': False,
+        'shopping_cart_final_answer': False,
+
         "product_qa_available_tools": product_qa_tool_descriptions,
-        "shopping_cart_available_tools": shopping_cart_tool_descriptions
+        "shopping_cart_available_tools": shopping_cart_tool_descriptions,
     }
 
     checkpointer_config = {'configurable': {'thread_id': thread_id}}
