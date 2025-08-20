@@ -29,6 +29,8 @@ dependencies = [
     "psycopg2-binary",
     "psycopg[binary]",
     "rich",
-    "fastmcp",
-    "mcp[cli]"
+    "fastmcp >= 2.11.2",
+    "mcp[cli]",
+    "litellm",
+    "litellm[proxy]"
 ]

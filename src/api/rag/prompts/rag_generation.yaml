@@ -39,6 +39,7 @@ prompts:
     - The final answer to the user query should be a comprehensive answer that explains the actions that were performed to answer the query.
     - Never set final_answer to true if the plan is not complete.
     - You should output the next_agent field as well as the plan field.
+    - if user asks trivia like weather or what kind of products you sell, you should set final_answer to true, next_agent to "" and output the answer to the user's query gently informing them of your scope.
 
   product_qa_agent: |
     You are a shopping assistant that can answer questions about the products in stock.

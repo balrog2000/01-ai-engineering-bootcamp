@@ -21,7 +21,10 @@ from rich.theme import Theme
 from rich.pretty import pretty_repr, pprint
 import logging
 from api.rag.tools import add_to_shopping_cart, remove_from_cart, get_shopping_cart
+import os
 
+# Ensure the logs directory exists to prevent errors
+os.makedirs("logs", exist_ok=True)
 
 # Create a file for logging output
 log_file_path = "logs/graph.log"
