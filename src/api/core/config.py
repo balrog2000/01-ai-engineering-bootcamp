@@ -17,6 +17,9 @@ class Config(BaseSettings):
     GENERATION_MODEL: str
     GENERATION_MODEL_PROVIDER: str
     PROMPT_TEMPLATE_PATH: str = "src/api/rag/prompts/rag_generation.yaml"
+    PROMPT_TEMPLATE_PATH_COORDINATOR: str = "src/api/rag/prompts/coordinator_agent.yaml"
+    PROMPT_TEMPLATE_PATH_PRODUCT_QA: str = "src/api/rag/prompts/product_qa_agent.yaml"
+    PROMPT_TEMPLATE_PATH_SHOPPING_CART: str = "src/api/rag/prompts/shopping_cart_agent.yaml"
     KAFKA_HOST: str
     KAFKA_PORT: int
     KAFKA_TOPIC: str
