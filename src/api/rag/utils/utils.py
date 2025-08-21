@@ -6,7 +6,7 @@ import json
 import ast
 import inspect
 from typing import Dict, Any
-import src.api.rag.tools as tools
+import api.rag.tools as tools
 from fastmcp import Client as FastMCPClient
 
 ls_client = Client()
@@ -26,7 +26,11 @@ def prompt_template_registry(prompt_name):
 
 def format_ai_message(response):
     # if response.tool_calls and not response.final_answer:
-    if response.tool_calls:
+    if response.final_answer:
+        ai_message = AIMessage(
+            content=response.answer,
+        )
+    elif response.tool_calls:
         tool_calls = []
         for i, tc in enumerate(response.tool_calls):
             tool_calls.append({
