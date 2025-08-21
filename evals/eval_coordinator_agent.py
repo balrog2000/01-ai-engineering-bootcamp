@@ -28,8 +28,6 @@ models_to_test = {
 }
 
 results = {}
-output_message = "\n"
-avg_metrics = []
 
 for model, evaluator in models_to_test.items():
     results[model] = ls_client.evaluate(
@@ -42,6 +40,9 @@ for model, evaluator in models_to_test.items():
 
 time.sleep(SLEEP_TIME)
 
+output_message = "\n"
+avg_metrics = []
+error_count = 0
 for model, evaluator in models_to_test.items():
     results_resp = ls_client.read_project(
         project_name=results[model].experiment_name,
@@ -50,12 +51,15 @@ for model, evaluator in models_to_test.items():
 
     avg_metric = results_resp.feedback_stats[evaluator.__name__]['avg']
     avg_metrics.append(avg_metric)
+    error_count += results_resp.feedback_stats[evaluator.__name__]['errors']
     if avg_metric >= ACC_THRESHOLD:
         output_message += f"✅ {model} - Success: {avg_metric}\n"
     else:
         output_message += f"❌ {model} - Failure: {avg_metric}\n"
 
-if all([metric >= ACC_THRESHOLD for metric in avg_metrics]):
+if error_count > 0:
+    raise AssertionError(f"Error count: {error_count}")
+elif all([metric >= ACC_THRESHOLD for metric in avg_metrics]):
     print(output_message, flush=True)
 else:
     raise AssertionError(output_message)
