@@ -2,8 +2,9 @@ from langsmith import Client
 from src.api.rag.agents import coordinator_agent_node
 from src.api.rag.graph import State
 from src.api.core.config import config
-
-
+import time
+ACC_THRESHOLD = 0.8
+SLEEP_TIME = 5
 ls_client = Client(api_key=config.LANGSMITH_API_KEY)
 
 def next_agent_core_evaluator(run, example):
@@ -26,12 +27,36 @@ models_to_test = {
     'groq/llama-3.3-70b-versatile': next_agent_evaluator_groq_llama_3_3_70b_versatile,
 }
 
+results = {}
+output_message = "\n"
+avg_metrics = []
 
 for model, evaluator in models_to_test.items():
-    results = ls_client.evaluate(
+    results[model] = ls_client.evaluate(
         lambda x: coordinator_agent_node(State(messages=x['messages']), models=[model]),
         data="coordinator-evaluation-dataset",
         num_repetitions=1,
         evaluators = [evaluator],
         experiment_prefix=model
     )
+
+time.sleep(SLEEP_TIME)
+
+for model, evaluator in models_to_test.items():
+    results_resp = ls_client.read_project(
+        project_name=results[model].experiment_name,
+        include_stats=True,
+    )
+
+    avg_metric = results_resp.feedback_stats[evaluator.__name__]['avg']
+    avg_metrics.append(avg_metric)
+    if avg_metric >= ACC_THRESHOLD:
+        output_message += f"✅ {model} - Success: {avg_metric}\n"
+    else:
+        output_message += f"❌ {model} - Failure: {avg_metric}\n"
+
+if all([metric >= ACC_THRESHOLD for metric in avg_metrics]):
+    print(output_message, flush=True)
+else:
+    raise AssertionError(output_message)
+
